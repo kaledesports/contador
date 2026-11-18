@@ -1,0 +1,64 @@
+:root{
+  --bg:#f4f2f8; --panel:#ffffff; --field:#ece9f3; --text:#1c1626; --muted:#6a6277; --line:#d9d4e4;
+  --accent:#7c3aed; --accent-text:#ffffff; --danger:#c62828; --stage:#1c1626;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#120e1a; --panel:#1b1626; --field:#261f35; --text:#f1edf8; --muted:#a79fb8; --line:#352c47;
+    --accent:#a970ff; --accent-text:#14091f; --danger:#ff6b6b; --stage:#0a0710;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#120e1a; --panel:#1b1626; --field:#261f35; --text:#f1edf8; --muted:#a79fb8; --line:#352c47;
+  --accent:#a970ff; --accent-text:#14091f; --danger:#ff6b6b; --stage:#0a0710;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:400 15px/1.45 "Rubik",system-ui,"Segoe UI",Arial,sans-serif;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;padding:20px clamp(16px,4vw,40px)}
+header h1{margin:0;font-size:1.5rem;font-weight:800;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+.btn{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.main{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:700}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:6px 10px;font-size:.85rem}
+
+main{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:20px;padding:0 clamp(16px,4vw,40px) 40px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.stage{background:var(--stage);padding:22px 16px;text-align:center;overflow:hidden}
+.label{margin:0 0 4px;font-size:1rem;font-weight:500;opacity:.85;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+.disp{font-weight:800;font-variant-numeric:tabular-nums;line-height:1.05;letter-spacing:.01em;text-shadow:0 3px 12px rgba(0,0,0,.55);white-space:nowrap}
+.disp.done{animation:blink 1s steps(2,jump-none) infinite}
+@keyframes blink{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.disp.done{animation:none}}
+
+.ctl{padding:14px;display:grid;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.row>*{flex:1 1 auto}
+.field{display:grid;gap:4px;font-size:.8rem;color:var(--muted);min-width:0}
+.field input,.field select{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;color:var(--text)}
+.field input[type=color]{padding:2px;height:36px;cursor:pointer}
+.field input[type=range]{padding:0;accent-color:var(--accent)}
+.dur{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.card[data-mode="up"] .dur,.card[data-mode="up"] .endf{display:none}
+.chk{display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted)}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+.actions .btn{flex:1 1 0}
+
+.exit{display:none;position:fixed;right:10px;bottom:10px;opacity:0;transition:opacity .2s}
+.exit:hover,.exit:focus-visible{opacity:1}
+
+/* Modo overlay: solo los números, sin interfaz */
+body.overlay header,body.overlay .ctl{display:none}
+body.overlay{min-height:100vh;display:block}
+body.overlay main{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:16px}
+body.overlay .card{background:none;border:0;border-radius:0;overflow:visible}
+body.overlay .stage{background:none;padding:0;text-align:left;overflow:visible}
+body.overlay .exit{display:block}

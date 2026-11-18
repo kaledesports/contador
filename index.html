@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contadores para Twitch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div>
+    <h1>Contadores para Twitch</h1>
+    <p>Crea cuentas atrás y cronómetros, y muéstralos en tu directo.</p>
+  </div>
+  <div class="bar">
+    <button class="btn main" id="add">Nuevo contador</button>
+    <button class="btn" id="ov">Modo overlay</button>
+    <label class="field" style="grid-auto-flow:column;align-items:center;gap:6px">Fondo overlay
+      <select id="bg"><option value="transparent">Transparente</option><option value="#00b140">Verde chroma</option><option value="#000000">Negro</option></select>
+    </label>
+  </div>
+</header>
+<main id="grid"></main>
+<button class="btn exit" id="exit">Salir del overlay (Esc)</button>
+
+<script>
+const KEY = "twitch-timers-v1";
+let timers = [], bg = "transparent", audio = null, lastSave = 0;
+const $ = s => document.querySelector(s);
+const grid = $("#grid");
+
+function make(){
+  return {id:Math.random().toString(36).slice(2,9), name:"Contador", mode:"down", h:0, m:10, s:0, value:600000,
+    running:false, last:0, done:false, color:"#ffffff", size:96, endText:"¡Se acabó el tiempo!", showName:true};
+}
+function esc(x){return String(x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function load(){
+  try{ const d = JSON.parse(localStorage.getItem(KEY)||"null"); if(d&&Array.isArray(d.timers)){timers=d.timers; bg=d.bg||bg;} }catch(e){}
+  if(!timers.length) timers=[make()];
+  const now = Date.now();
+  timers.forEach(t=>{ if(t.running) advance(t, now); });
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({timers,bg})); }catch(e){}
+}
+function advance(t, now){
+  const d = now - t.last; t.last = now;
+  t.value += t.mode==="down" ? -d : d;
+  if(t.mode==="down" && t.value<=0){ t.value=0; t.running=false; t.done=true; return true; }
+  return false;
+}
+function reset(t){
+  t.value = t.mode==="down" ? (t.h*3600 + t.m*60 + t.s)*1000 : 0;
+  t.running=false; t.done=false;
+}
+function fmt(t){
+  if(t.done && t.mode==="down" && t.endText) return t.endText;
+  const total = Math.max(0, t.mode==="down" ? Math.ceil(t.value/1000) : Math.floor(t.value/1000));
+  const h = Math.floor(total/3600), m = Math.floor(total%3600/60), s = total%60;
+  const p = n => String(n).padStart(2,"0");
+  const showH = h>0 || (t.mode==="down" && t.h>0);
+  return (showH ? p(h)+":" : "") + p(m) + ":" + p(s);
+}
+function beep(){
+  if(!audio) return;
+  [0,.25,.5].forEach(o=>{
+    const osc = audio.createOscillator(), g = audio.createGain();
+    osc.frequency.value = 880; osc.connect(g); g.connect(audio.destination);
+    const t0 = audio.currentTime + o;
+    g.gain.setValueAtTime(.2,t0); g.gain.exponentialRampToValueAtTime(.001,t0+.2);
+    osc.start(t0); osc.stop(t0+.22);
+  });
+}
+
+function cardHTML(t){
+  return `<article class="card" data-id="${t.id}" data-mode="${t.mode}">
+  <div class="stage"><p class="label"></p><div class="disp"></div></div>
+  <div class="ctl">
+    <div class="row">
+      <label class="field" style="flex:2 1 140px">Nombre<input data-k="name" value="${esc(t.name)}" maxlength="40"></label>
+      <label class="field">Tipo<select data-k="mode">
+        <option value="down"${t.mode==="down"?" selected":""}>Cuenta atrás</option>
+        <option value="up"${t.mode==="up"?" selected":""}>Cronómetro</option></select></label>
+    </div>
+    <div class="dur">
+      <label class="field">Horas<input type="number" min="0" max="99" data-k="h" value="${t.h}"></label>
+      <label class="field">Minutos<input type="number" min="0" max="999" data-k="m" value="${t.m}"></label>
+      <label class="field">Segundos<input type="number" min="0" max="999" data-k="s" value="${t.s}"></label>
+    </div>
+    <div class="row">
+      <label class="field" style="flex:0 0 64px">Color<input type="color" data-k="color" value="${t.color}"></label>
+      <label class="field" style="flex:1 1 120px">Tamaño<input type="range" min="32" max="220" data-k="size" value="${t.size}"></label>
+    </div>
+    <label class="field endf">Mensaje al terminar<input data-k="endText" value="${esc(t.endText)}" maxlength="50"></label>
+    <label class="chk"><input type="checkbox" data-k="showName"${t.showName?" checked":""}>Mostrar el nombre sobre el contador</label>
+    <div class="row actions">
+      <button class="btn main" data-a="toggle"></button>
+      <button class="btn" data-a="reset">Reiniciar</button>
+    </div>
+    <div class="row actions">
+      <button class="btn sm" data-a="add" data-v="-5">−5 min</button>
+      <button class="btn sm" data-a="add" data-v="-1">−1 min</button>
+      <button class="btn sm" data-a="add" data-v="1">+1 min</button>
+      <button class="btn sm" data-a="add" data-v="5">+5 min</button>
+      <button class="btn sm danger" data-a="del">Eliminar</button>
+    </div>
+  </div></article>`;
+}
+function render(){ grid.innerHTML = timers.map(cardHTML).join(""); paint(); }
+function paint(){
+  grid.querySelectorAll(".card").forEach(c=>{
+    const t = timers.find(x=>x.id===c.dataset.id); if(!t) return;
+    c.dataset.mode = t.mode;
+    const d = c.querySelector(".disp"), l = c.querySelector(".label");
+    d.textContent = fmt(t); d.style.color = t.color; d.style.fontSize = t.size+"px";
+    d.classList.toggle("done", t.done);
+    l.textContent = t.name; l.style.color = t.color; l.style.display = t.showName && t.name ? "" : "none";
+    c.querySelector('[data-a="toggle"]').textContent = t.running ? "Pausar" : "Iniciar";
+  });
+}
+const get = el => timers.find(x=>x.id===el.closest(".card").dataset.id);
+
+grid.addEventListener("input", e=>{
+  const el = e.target, k = el.dataset.k; if(!k) return;
+  const t = get(el); let v = el.type==="checkbox" ? el.checked : el.value;
+  if(["h","m","s","size"].includes(k)) v = Math.max(0, parseInt(v,10)||0);
+  t[k] = v;
+  if((k==="mode"||k==="h"||k==="m"||k==="s") && !t.running) reset(t);
+  paint(); save();
+});
+grid.addEventListener("click", e=>{
+  const b = e.target.closest("button[data-a]"); if(!b) return;
+  const t = get(b), a = b.dataset.a;
+  if(!audio){ try{ audio = new (window.AudioContext||window.webkitAudioContext)(); }catch(err){} }
+  if(a==="toggle"){
+    if(t.running){ t.running=false; }
+    else{ if(t.mode==="down" && t.value<=0) reset(t); t.running=true; t.last=Date.now(); }
+  }else if(a==="reset"){ reset(t); }
+  else if(a==="add"){
+    t.value = Math.max(0, t.value + (+b.dataset.v)*60000);
+    if(t.done && t.value>0) t.done=false;
+  }else if(a==="del"){
+    timers = timers.filter(x=>x!==t); if(!timers.length) timers=[make()]; render();
+  }
+  paint(); save();
+});
+$("#add").onclick = ()=>{ const t=make(); t.name="Contador "+(timers.length+1); timers.push(t); render(); save(); };
+$("#bg").onchange = e=>{ bg = e.target.value; applyBg(); save(); };
+$("#ov").onclick = ()=>{ location.hash = "overlay"; };
+$("#exit").onclick = ()=>{ location.hash = "editor"; };
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && location.hash==="#overlay") location.hash="editor"; });
+
+function applyBg(){
+  const ov = location.hash==="#overlay";
+  document.body.style.background = ov ? (bg==="transparent" ? "transparent" : bg) : "";
+  document.documentElement.style.background = ov && bg==="transparent" ? "transparent" : "";
+}
+function applyHash(){ document.body.classList.toggle("overlay", location.hash==="#overlay"); applyBg(); }
+window.addEventListener("hashchange", applyHash);
+
+setInterval(()=>{
+  const now = Date.now(); let ended = false;
+  timers.forEach(t=>{ if(t.running && advance(t, now)) ended = true; });
+  if(ended) beep();
+  paint();
+  if(now - lastSave > 1000){ lastSave = now; save(); }
+}, 100);
+
+load(); $("#bg").value = bg; render(); applyHash();
+</script>
+</body>
+</html>
